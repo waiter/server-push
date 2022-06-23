@@ -174,7 +174,6 @@
       pushStatus(s, '连接错误', 'danger');
     };
     ws.onclose = e => {
-      console.log(e);
       pushStatus(s, '连接已断开', 'danger');
     };
   }
@@ -187,9 +186,8 @@
         id += data.length;
     }
     window.change = change;
-    pushStatus(s, '等待中', 'secondary');
     $('body').append('<iframe src="/api/iframe"></iframe>');
-    pushStatus(s, '等待消息中', 'success');
+    pushStatus(s, '未知状态', 'warning');
   }
 
   window.onload = () => {
