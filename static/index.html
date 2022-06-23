@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<head>
+  <title>服务端推送测试</title>
+  <link href="/static/bootstrap.min.css" rel="stylesheet" >
+  <script src="/static/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+<div class="container pt-3">
+  <form>
+    <div class="mb-3">
+      <label class="form-label" for="info">输入需要服务端推送的内容</label>
+      <textarea class="form-control" id="info" rows="3"></textarea>
+    </div>
+    <button id="btn" type="submit" class="btn btn-primary">推送</button>
+  </form>
+  <div class="h5 border-bottom mt-3 pt-3 pb-3 text-info border-info">各种推送方式信息接收情况</div>
+  <div class="row">
+    <div class="col">
+      <div class="card" id="polling">
+        <div class="card-header">短轮询（<span></span>）</div>
+        <ol class="list-group list-group-flush list-group-numbered">
+        </ol>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" id="long-polling">
+        <div class="card-header">长轮询（<span></span>）</div>
+        <ol class="list-group list-group-flush list-group-numbered">
+        </ol>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" id="sse">
+        <div class="card-header">SSE（<span></span>）</div>
+        <ol class="list-group list-group-flush list-group-numbered">
+        </ol>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" id="ws">
+        <div class="card-header">WebSocket（<span></span>）</div>
+        <ol class="list-group list-group-flush list-group-numbered">
+        </ol>
+      </div>
+    </div>
+    <div class="col">
+      <div class="card" id="iframe">
+        <div class="card-header">iFrame（<span></span>）</div>
+        <ol class="list-group list-group-flush list-group-numbered">
+        </ol>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+  $('#btn').on('click', (e) => {
+    e.preventDefault();
+    const info = $('#info').val();
+    if (!info) {
+      alert('请输入内容');
+      return;
+    }
+    $('#info').val('');
+    $.ajax({
+      url: '/api/push',
+      data: { info },
+    }).fail((err) => {
+      console.log(err);
+      alert('推送错误');
+    });
+  });
+
+  function pushStatus(s, status, type) {
+    $(`#${s} .card-header span`).html(`<span class="text-${type}">${status}</span>`);
+  }
+
+  function pushRecord(s, datas, pre) {
+    const all = datas.reduce((a, c, ind) => {
+      const now = (ind + pre) % 2;
+      return `${a}<li class="list-group-item ${now ? 'list-group-item-info' : ''}">${c}</li>`;
+    }, '');
+    $(`#${s} ol`).append(all);
+  }
+
+  function polling() {
+    const s = 'polling';
+    let id = 0;
+    pushStatus(s, '等待中', 'secondary');
+    function poll() {
+      pushStatus(s, '请求中', 'warning');
+      $.ajax({
+        url: '/api/polling',
+        data: { id },
+      }).done(res => {
+        pushStatus(s, '请求成功', 'success');
+        pushRecord(s, res, id);
+        id += res.length;
+      }).fail(e => {
+        pushStatus(s, '请求失败', 'danger');
+      }).always(() => {
+        setTimeout(poll, 11000);
+        setTimeout(() => {
+          pushStatus(s, '等待中', 'secondary');
+        }, 1000);
+      });
+    }
+    poll();
+  }
+
+  function longPolling() {
+    const s = 'long-polling';
+    let id = 0;
+    pushStatus(s, '等待中', 'secondary');
+    function poll() {
+      pushStatus(s, '请求中', 'warning');
+      $.ajax({
+        url: '/api/long-polling',
+        data: { id },
+        timeout: 60000,
+      }).done(res => {
+        pushStatus(s, '请求成功', 'success');
+        pushRecord(s, res, id);
+        id += res.length;
+      }).fail(e => {
+        pushStatus(s, '请求失败', 'danger');
+      }).always(() => {
+        setTimeout(poll, 1000);
+      });
+    }
+    poll();
+  }
+
+  function sse() {
+    const s = 'sse';
+    let id = 0;
+    pushStatus(s, '等待连接中', 'secondary');
+    const es = new EventSource('/api/sse');
+    es.onmessage = (e) => {
+      try {
+        const c = JSON.parse(e.data);
+        pushRecord(s, c, id);
+        id += c.length;
+      } catch (e) {
+        console.log(e);
+      }
+    }
+    es.onopen = () => {
+      pushStatus(s, '等待消息中', 'success');
+    }
+    es.onerror = () => {
+      pushStatus(s, '连接错误', 'danger');
+    }
+  }
+
+  function ws() {
+    const s = 'ws';
+    let id = 0;
+    pushStatus(s, '等待连接中', 'secondary');
+    const ws = new WebSocket('ws://localhost:3000/ws');
+    ws.onmessage = e => {
+      try {
+        const c = JSON.parse(e.data);
+        pushRecord(s, c, id);
+        id += c.length;
+      } catch (err) {
+        console.log(err);
+      }
+    };
+    ws.onopen = e => {
+      pushStatus(s, '等待消息中', 'success');
+    };
+    ws.onerror = e => {
+      console.log(e);
+      pushStatus(s, '连接错误', 'danger');
+    };
+    ws.onclose = e => {
+      console.log(e);
+      pushStatus(s, '连接已断开', 'danger');
+    };
+  }
+
+  function iframe() {
+    const s = 'iframe';
+    let id = 0;
+    function change(data) {
+        pushRecord(s, data, id);
+        id += data.length;
+    }
+    window.change = change;
+    pushStatus(s, '等待中', 'secondary');
+    $('body').append('<iframe src="/api/iframe"></iframe>');
+    pushStatus(s, '等待消息中', 'success');
+  }
+
+  window.onload = () => {
+    setTimeout(() => {
+      polling();
+      longPolling();
+      sse();
+      ws();
+      iframe();
+    }, 0);
+  }
+</script>
+</body>
