@@ -1,6 +1,8 @@
 # 服务端推送方式整理
 
 > **仅针对Web前端来看**
+> 
+> 详细可以查看：[https://mp.weixin.qq.com/s/XewrHKy6zzM9xyW3KHy1Xg](https://mp.weixin.qq.com/s/XewrHKy6zzM9xyW3KHy1Xg)
 
 ## 跑测试代码
 
@@ -14,3 +16,5 @@
 - SSE
 - WebSocket
 - iFrame
+
+![](./static/sample.png)
